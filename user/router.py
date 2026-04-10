@@ -33,11 +33,12 @@ def get_users_handler(
     session = Depends(get_session), #  with SessionFactory() as session: 의존성 주입으로 삭제한 코드  
 ):
     #with SessionFactory() as session:
+        # SELECT *FROM user;
         #statement = 구문(명령문)
-        stmt = select(User) # SELECT * FROM user;
-        result = session.execute(stmt)
-        users = result.scalars().all() # [user1, user2, user3]
-        return users
+    stmt = select(User) # SELECT * FROM user;
+    result = session.execute(stmt)
+    users = result.scalars().all() # [user1, user2, user3]
+    return users
 
 # 사용자 정보 검색 API
 # GET /users/search?name=alex
@@ -62,11 +63,11 @@ def search_user_handler(
         # stmt = select(User).where(User.job == job, 
 
     # with SessionFactory() as session:
-        result = session.execute(stmt)
-        users = result.scalars().all()
-        return users
-        # stmt = select(User).where(User.job == job, User.name == name)
-        # # 조건 둘다 검색할 수 있는
+    result = session.execute(stmt)
+    users = result.scalars().all()
+    return users
+    # stmt = select(User).where(User.job == job, User.name == name)
+    # # 조건 둘다 검색할 수 있는
 
     # 둘 다 없을 때
     # if name is None and job is None:
@@ -103,23 +104,23 @@ def get_user_one_handler(
     session = Depends(get_session),
 ):
     # with SessionFactory() as session:
-        stmt = select(User).where(User.id == user_id) 
-        # sql where 절, ID 맞는 애들 갖고 오는거라 1,0임
-        # SELECT * FROM user WHERE id = 1; (예시)
-        result = session.execute(stmt)
+    stmt = select(User).where(User.id == user_id) 
+    # sql where 절, ID 맞는 애들 갖고 오는거라 1,0임
+    # SELECT * FROM user WHERE id = 1; (예시)
+    result = session.execute(stmt)
 
-        # scalars() -> 첫번째 열의 데이터만 가져온다
-        # all() -> 리스트로 변환한다
-        
-        #scalar 존재하면 user객체 반환 존재하지 않으면 None
-        user = result.scalar()
+    # scalars() -> 첫번째 열의 데이터만 가져온다
+    # all() -> 리스트로 변환한다
+    
+    #scalar 존재하면 user객체 반환 존재하지 않으면 None
+    user = result.scalar()
 
-        if not user:
-            raise HTTPException(
-        status_code=status.HTTP_404_NOT_FOUND,
-        detail="User Not Found",
-    )
-        return user 
+    if not user:
+        raise HTTPException(
+    status_code=status.HTTP_404_NOT_FOUND,
+    detail="User Not Found",
+)
+    return user 
     
 
     # for user in users:
@@ -147,12 +148,12 @@ def create_user_handler(
     # session = SessionFactory()
 
     # with SessionFactory() as session:
-        new_user = User(name=body.name, job=body.job)
+    new_user = User(name=body.name, job=body.job)
 
-        session.add(new_user) # 새로운 유저 추가해라
-        session.commit() # 변경사항 저장 
-        session.refresh(new_user) #새로고침 (id, created_at 불러옴)
-        return new_user
+    session.add(new_user) # 새로운 유저 추가해라
+    session.commit() # 변경사항 저장 
+    session.refresh(new_user) #새로고침 (id, created_at 불러옴)
+    return new_user
     
 
 
@@ -186,22 +187,22 @@ def update_user_handler(
     # 2) 처리
     # user_id로 사용자를 조회 
     # with SessionFactory() as session:
-        stmt = select(User).where(User.id == user_id)
-        result = session.execute(stmt)
-        user = result.scalar()
-        
-        if not user:
-        # 예외처리 먼저, 사용자가 없으면 none 반환 할 수 있어서 
-            raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="User Not Found",
-    )
-        user.job = body.job
-        # session.add() 필요없는이유: 처음부터 session에서 user를 가져와서 누군지 알아서
-        # 굳이 add해서 stage에 올릴 필요가 없음 
-        session.commit() # user 상태(job)을 DB에 반영한다
-        # e.g. UPDATE user SET job = '  ' WHERE user.id = 1;
-        return user # session을 닫는다 
+    stmt = select(User).where(User.id == user_id)
+    result = session.execute(stmt)
+    user = result.scalar()
+    
+    if not user:
+    # 예외처리 먼저, 사용자가 없으면 none 반환 할 수 있어서 
+        raise HTTPException(
+        status_code=status.HTTP_404_NOT_FOUND,
+        detail="User Not Found",
+)
+    user.job = body.job
+    # session.add() 필요없는이유: 처음부터 session에서 user를 가져와서 누군지 알아서
+    # 굳이 add해서 stage에 올릴 필요가 없음 
+    session.commit() # user 상태(job)을 DB에 반영한다
+    # e.g. UPDATE user SET job = '  ' WHERE user.id = 1;
+    return user # session을 닫는다 
 
     # for user in users:
     #     if user["id"] == user_id:
@@ -240,9 +241,9 @@ def delete_user_handler(
     
     #조회없이 곧바로 삭제
     # with SessionFactory() as session:
-        stmt = delete(User).where(User.id == user_id)
-        session.execute(stmt)
-        session.commit()
+    stmt = delete(User).where(User.id == user_id)
+    session.execute(stmt)
+    session.commit()
 
 
 
