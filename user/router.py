@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Path, Query, status, HTTPException, Depends
 from sqlalchemy import select, delete
 from database.connection import SessionFactory
+from database.connection_async import get_async_session
 from user.models import User
 from user.request import UserCreateRequest, UserUpdateRequest
 from user.response import UserResponse
@@ -28,16 +29,17 @@ router = APIRouter(tags=["User"])
         summary="전체 사용자 목록 조회 API",
         response_model=list[UserResponse], # type hint로 준다 
         )
-def get_users_handler(
+async def get_users_handler(
     # Depends: FastAPI에서 의존성(get_session)을 자동으로 실행/ 주입/ 정리 
-    session = Depends(get_session), #  with SessionFactory() as session: 의존성 주입으로 삭제한 코드  
+    session = Depends(get_async_session), #  with SessionFactory() as session: 의존성 주입으로 삭제한 코드  
 ):
     #with SessionFactory() as session:
         # SELECT *FROM user;
         #statement = 구문(명령문)
     stmt = select(User) # SELECT * FROM user;
-    result = session.execute(stmt)
-    users = result.scalars().all() # [user1, user2, user3]
+    result = await session.execute(stmt) # 실제 **실행(execute)하는** 구간에 await 적용
+    users = result.scalars().all() 
+    # [user1, user2, user3], 이미 데이터 불러온 상태에서 리스트 형태로 객체꺼냄
     return users
 
 # 사용자 정보 검색 API
@@ -49,10 +51,10 @@ def get_users_handler(
         summary= "사용자 정보 검색 API",
         response_model=list[UserResponse]
         )
-def search_user_handler(
+async def search_user_handler(
     name: str | None = Query(None), 
     job: str | None = Query(None),
-    session = Depends(get_session),
+    session = Depends(get_async_session),
 ):
     stmt = select(User) # 체이닝
     if name:
@@ -63,7 +65,7 @@ def search_user_handler(
         # stmt = select(User).where(User.job == job, 
 
     # with SessionFactory() as session:
-    result = session.execute(stmt)
+    result = await session.execute(stmt)
     users = result.scalars().all()
     return users
     # stmt = select(User).where(User.job == job, User.name == name)
@@ -89,25 +91,25 @@ def search_user_handler(
     
 # 단일 사용자 데이터 조회 API
 # GET /users/1 -> 1번 사용자 데이터 조회 등등
-# 사용자가 만을 때는 변수로 받을 수 있게 한다.
+# 사용자가 많을 때는 변수로 받을 수 있게 한다.
 # GET /users/{user_id} -> {user_id} 사용자 데이터 조회 등등
 @router.get(
         "/users/{user_id}",
         summary="단일 사용자 데이터 조회 API",
         response_model=UserResponse
         )
-def get_user_one_handler(
+async def get_user_one_handler(
     #user_id: int  # : int -> 숫자로 바꾸는 문법
     #이상 (=Greater than or equal to, le=9999 less than, max_digits= 최대 몇자리 허용? ),
     #  '...' 의 의미는 필수 조건이라는 의미, Path(..., ge=1, le=9999, max_digits=)
     user_id: int = Path(..., ge=1),
-    session = Depends(get_session),
+    session = Depends(get_async_session),
 ):
     # with SessionFactory() as session:
     stmt = select(User).where(User.id == user_id) 
     # sql where 절, ID 맞는 애들 갖고 오는거라 1,0임
     # SELECT * FROM user WHERE id = 1; (예시)
-    result = session.execute(stmt)
+    result = await session.execute(stmt)
 
     # scalars() -> 첫번째 열의 데이터만 가져온다
     # all() -> 리스트로 변환한다
@@ -138,10 +140,10 @@ def get_user_one_handler(
     summary="회원 추가 API",
     response_model=UserResponse
 )
-def create_user_handler(
+async def create_user_handler(
     # 1) 사용자 데이터를 넘겨 받는다 + 유효성 검사
     body: UserCreateRequest,
-    session = Depends(get_session)
+    session = Depends(get_async_session)
 ):
     
     # 2) 사용자 데이터를 저장한다
@@ -151,8 +153,11 @@ def create_user_handler(
     new_user = User(name=body.name, job=body.job)
 
     session.add(new_user) # 새로운 유저 추가해라
-    session.commit() # 변경사항 저장 
-    session.refresh(new_user) #새로고침 (id, created_at 불러옴)
+    print(new_user.id, new_user.created_at)
+    await session.commit() # 변경사항 저장 , commit 하는 시점에 대기시간 발생
+    await session.refresh(new_user) 
+    # 새로고침 (id, created_at 불러옴) 갱신 -DB 자동생성이라 다시 최신 데이터 불러와야해서 대기시간 발생
+    print(new_user.id, new_user.created_at) 
     return new_user
     
 
@@ -176,11 +181,11 @@ def create_user_handler(
         summary="회원 정보 수정 API",
         response_model=UserResponse,
         )
-def update_user_handler(
+async def update_user_handler(
     # 1) 입력값 정의: 클라이언트로부터 수정할 데이터를 넘겨 받는다 
     user_id: int,
     body: UserUpdateRequest,
-    session = Depends(get_session)
+    session = Depends(get_async_session)
 ):
 
     
@@ -188,7 +193,7 @@ def update_user_handler(
     # user_id로 사용자를 조회 
     # with SessionFactory() as session:
     stmt = select(User).where(User.id == user_id)
-    result = session.execute(stmt)
+    result = await session.execute(stmt)
     user = result.scalar()
     
     if not user:
@@ -200,7 +205,7 @@ def update_user_handler(
     user.job = body.job
     # session.add() 필요없는이유: 처음부터 session에서 user를 가져와서 누군지 알아서
     # 굳이 add해서 stage에 올릴 필요가 없음 
-    session.commit() # user 상태(job)을 DB에 반영한다
+    await session.commit() # user 상태(job)을 DB에 반영한다
     # e.g. UPDATE user SET job = '  ' WHERE user.id = 1;
     return user # session을 닫는다 
 
@@ -218,9 +223,9 @@ def update_user_handler(
         summary="회원 삭제 API",
         status_code=status.HTTP_204_NO_CONTENT, # 응답 본문이 비어있음 
         )
-def delete_user_handler(
+async def delete_user_handler(
     user_id: int,
-    session = Depends(get_session),
+    session = Depends(get_async_session),
 ):
     # 1) get + delete
     #   user 정보 갖고와서 삭제
@@ -242,8 +247,8 @@ def delete_user_handler(
     #조회없이 곧바로 삭제
     # with SessionFactory() as session:
     stmt = delete(User).where(User.id == user_id)
-    session.execute(stmt)
-    session.commit()
+    await session.execute(stmt) # 삭제
+    await session.commit() # 확정
 
 
 
